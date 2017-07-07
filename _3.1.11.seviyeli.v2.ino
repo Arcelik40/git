@@ -81,7 +81,6 @@ const int acilbuton = 13;
 //////////////////////////
 
 void setup() {
-
   roboclaw.begin(38400);
   Serial.begin(9600);
 

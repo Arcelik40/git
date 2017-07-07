@@ -1,7 +1,7 @@
 import serial, time, sys
 
 control = True;
-arduino = serial.Serial('COM3', 9600, timeout = .1)
+arduino = serial.Serial('COM4', 9600, timeout = .1)
 time.sleep(1) # ONEMLI
 
 instruction = sys.argv[1]
