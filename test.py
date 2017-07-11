@@ -4,9 +4,12 @@ control = True;
 arduino = serial.Serial('COM4', 9600, timeout = .1)
 time.sleep(2) # ONEMLI
 
+inst = sys.argv[1]
+
 while control:
-    inst = raw_input()
-    arduino.write(inst)
+    com = inst[0]
+    inst = inst[1:]
+    arduino.write(com)
     time.sleep(1);
     while (arduino.in_waiting > 0):
         data = arduino.readline()[:-2]
@@ -16,4 +19,5 @@ while control:
             else:
                 print data
         time.sleep(0.009)
+
 arduino.close()

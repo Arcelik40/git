@@ -72,8 +72,10 @@ void de(char inst) {
             Serial.println(cur_pos.rfid);
             break;
         case HALT:
-            break;
+            Serial.println("G");
+            Serial.println("HALT");
         default:
+            Serial.println("HALT");
             break;
     }
 }
