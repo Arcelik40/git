@@ -31,20 +31,29 @@ void loop() {
     }
 }
 
+void lineFollow(void)
+{
+  Pos cu_pos= report_pos();
+  Serial.println (cu_pos.rfid);
+}
+
 void de(char inst) {
   Pos cur_pos;
     switch (inst) {
         case MOV:
-            mov();
+            lineFollow();
             break;
         case RIGHT:
             turn_right();
+            lineFollow();
             break;
         case LEFT:
             turn_left();
+            lineFollow();
             break;
         case BACK:
             turn_back();
+            lineFollow();
             break;
         case RPT:
             cur_pos = report_pos();
