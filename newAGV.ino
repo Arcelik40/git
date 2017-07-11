@@ -1,107 +1,100 @@
+#include <SPI.h>
 #include <MFRC522.h>
 
 typedef enum AGV_opcode {
     MOV = 'A', RIGHT = 'B', LEFT = 'C', RPT = 'D', BACK = 'F', HALT = 'G' 
 } AGV_opcode;
 
+struct Pos
+{
+    bool success;
+    String rfid;
+};
+
 #define RST_PIN 40 //9
 #define SS_PIN 53 //10
 
 
-String lastRfid;
-
-
 MFRC522 mfrc522(SS_PIN, RST_PIN);
-MFRC522::MIFARE_Key key;
+
 void setup() {
     Serial.begin(9600);
+    SPI.begin();
     mfrc522.PCD_Init();
     delay(100);
 }
 
 void loop() {
-    de_cycle(fetch(Serial), Serial);
-}
-
-String fetch(HardwareSerial &serial) {
-    return (serial.readStringUntil('\n'));
-}
-
-void de_cycle(String inst, HardwareSerial &serial) {
-    while (true) {
-        int opcode  = inst[0];
-        inst.remove(0,1);
-        switch (opcode) {
-            case MOV:
-                mov(serial);
-                break;
-            case RIGHT:
-                turn_right(serial);
-                break;
-            case LEFT:
-                turn_left(serial);
-                break;
-            case BACK:
-                turn_back(serial);
-                break;
-            case RPT:
-                report_pos(serial);
-                break;
-            case HALT:
-                halt(serial);
-                return;
-            default:
-                halt(serial);
-                return;
+    if (Serial.available()) {
+        char inst = Serial.read();
+        de(inst);
     }
-  }
 }
 
-static inline void mov(HardwareSerial &serial) {
-    serial.println("ILERI");
+de(char inst) {
+    switch (opcode) {
+        case MOV:
+            mov();
+            break;
+        case RIGHT:
+            turn_right();
+            break;
+        case LEFT:
+            turn_left();
+            break;
+        case BACK:
+            turn_back();
+            break;
+        case RPT:
+            report_pos();
+            break;
+        case HALT:
+            halt = true;
+            break;
+        default:
+            halt = true;
+    }
 }
 
-static inline void turn_right(HardwareSerial &serial) {
-    serial.println("SAG");
+static inline void mov() {
+    Serial.println("ILERI");
 }
 
-static inline void turn_left(HardwareSerial &serial) {
-    serial.println("SOL");
+static inline void turn_right() {
+    Serial.println("SAG");
 }
 
-static inline void halt(HardwareSerial &serial) {
-  serial.println("HALT");
+static inline void turn_left() {
+    Serial.println("SOL");
 }
 
-static inline void turn_back(HardwareSerial &serial) {
-  serial.println("GERI");
+static inline void turn_back() {
+    Serial.println("GERI");
 }
 
-static inline  report_pos(HardwareSerial &serial) {
-    if (!mfrc522.PICC_IsNewCardPresent())
-        return;
-    if (!mfrc522.PICC_ReadCardSerial())
-        return;
-    String rfid = "";
+static inline Pos report_pos() {
+    Pos position;
+    position.success = false;
+    if (! mfrc522.PICC_IsNewCardPresent()) {
+        position.rfid = "NO NEW CARD PRESENT";
+        return position;
+    }
+    if (! mfrc522.PICC_ReadCardSerial()) {
+
+        position.rfid = "COULD NOT READ RFID CARD";
+        return position;
+    }
+
+    position.success = true;
     for (byte i = 0; i < mfrc522.uid.size; i++) {
-        rfid += mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ";
-        rfid += String(mfrc522.uid.uidByte[i], HEX);
+        position.rfid += mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ";
+        position.rfid += String(mfrc522.uid.uidByte[i], HEX);
     }
-  //string'in boyutunu ayarla ve tamamÄ±nÄ± bÃ¼yÃ¼k harfe Ã§evir
-    rfid.trim();
-    rfid.toUpperCase();
-    serial.println(serial);
-
-
-   if (rfid == lastRfid) /// bu Ã§Ä±kartÄ±labilir
-       return;
-  lastRfid = rfid;
+    position.rfid.trim();
+    position.rfid.toUpperCase();
+    return position;
 }
 
-static inline void failure(HardwareSerial &serial) {
-  serial.println("FAIL");
-}
-
-static inline void echo(String inst, HardwareSerial &serial) {
-    serial.println(inst);
+static inline void echo(String inst) {
+    Serial.println(inst);
 }
