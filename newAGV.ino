@@ -31,8 +31,9 @@ void loop() {
     }
 }
 
-de(char inst) {
-    switch (opcode) {
+void de(char inst) {
+  Pos cur_pos;
+    switch (inst) {
         case MOV:
             mov();
             break;
@@ -46,13 +47,13 @@ de(char inst) {
             turn_back();
             break;
         case RPT:
-            report_pos();
+            cur_pos = report_pos();
+            Serial.println(cur_pos.rfid);
             break;
         case HALT:
-            halt = true;
             break;
         default:
-            halt = true;
+            break;
     }
 }
 
