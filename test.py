@@ -15,4 +15,5 @@ while control:
                 control = False;
             else:
                 print data
+        time.sleep(0.009)
 arduino.close()
