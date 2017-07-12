@@ -1,15 +1,102 @@
 #include <SPI.h>
 #include <MFRC522.h>
 
+#define SENSOR_NUMBER 6
+const float Kp = 2.9;
+const float Ki = 0.00015;
+const float Kd = 1;
+const int ssr[SENSOR_NUMBER] = {4, 5, 6, 7, 8, 9};
+
 typedef enum AGV_opcode {
-    MOV = 'A', RIGHT = 'B', LEFT = 'C', RPT = 'D', BACK = 'F', HALT = 'G' 
+    MOV = 'W', RIGHT = 'A', LEFT = 'D', POS = 'P', BACK = 'S', SLOW = 'E', 
+    HALT = 'Q' 
 } AGV_opcode;
 
-struct Pos
-{
+struct Pos {
     bool success;
     String rfid;
 };
+
+struct Station {
+    bool loading;
+    bool unloading;
+    bool turning;
+}
+
+class Sensors {
+    private:
+        int sensorvalues[SENSOR_NUMBER];
+        int activeSensor;
+        float avgSensor;
+        float totalSensor;
+        float error;
+    public :
+        const int weights[SENSOR_NUMBER] = {-6, -2, -1, 1 , 2, 6};
+        void update(int *);
+        float getTotal();
+        float getAvg();
+        int   getActiveSensor();
+        void setTotal();
+        void setActiveSensor();
+        void setError();
+        void getError();
+        void setAvg();
+};
+
+Sensors::Sensors() {
+    sensorvalues = {0,0,0,0,0,0};
+    activeSensor = avgSensor = totalSensor = error = 0;
+}
+
+void Sensors::setActiveSensor() {
+    for (int i = 0; i < SENSOR_NUMBER; i++)
+        activeSensor += sensorvalues[i]
+}
+
+void Sensors::readSensors() {
+    for (int i = 0; i < SENSOR_NUMBER; i++)
+        sensorvalues[i] = digitalRead(ssr[i]);
+}
+
+void Sensors::setSensorValues(int *new_values) {
+    for (int i = 0; i < SENSOR_NUMBER; i++) 
+        sensorvalues[i] = new_values[i];
+}
+
+void Sensors::setTotal() {
+    for (int i = 0; i < SENSOR_NUMBER; i++) 
+        totalSensor += sensorvalues[i] * weights[i];
+}
+
+void Sensors::setAvg() {
+    avgSensor = totalSensor / activeSensor;
+}
+
+void Sensors::setError() {
+    error = avgSensor;
+}
+
+int Sensors::getActiveSensor() {
+
+    return activeSensor;
+}
+
+float Sensors::getTotal() {
+    return totalSensor;
+}
+
+float Sensors::getAvg() {
+    return avgSensor;
+}
+
+int Sensors::getError() {
+    return error;
+}
+
+void Sensors::setError() {
+    error = avgSensor;
+}
+
 
 #define RST_PIN 40 //9
 #define SS_PIN 53 //10
@@ -17,20 +104,30 @@ struct Pos
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 void setup() {
+    for (int i = 0; i < SENSOR_NUMBER; i++)  {
+        pinMode(ssr[i], INPUT);
+    }
     Serial.begin(9600);
     SPI.begin();
     mfrc522.PCD_Init();
     delay(100);
 }
 
+void read_sensor() {
+
+}
+
 void loop() {
     if (Serial.available()) {
         char inst = Serial.read();
-        de(inst);
+        if (inst == POS)
+            Serial.println(report_pos().rfid);
+        else
+            lineFollow(inst);
     }
 }
 
-void lineFollow(Pos cur_pos)
+void lineFollow(char inst)
 {
     if (cur_pos.rfid == "NO NEW CARD PRESENT") {
         cur_pos = report_pos();
@@ -51,7 +148,7 @@ void PID_and_go() {
 }
 
 void de(char inst) {
-    Pos cur_pos = report_pos();
+    Pos cur_pos;
     switch (inst) {
         case MOV:
             lineFollow(cur_pos);
@@ -68,7 +165,8 @@ void de(char inst) {
             turn_back();
             lineFollow(cur_pos);
             break;
-        case RPT:
+        case POS:
+            cur_pos = report_pos();
             Serial.println(cur_pos.rfid);
             break;
         case HALT:
@@ -121,4 +219,35 @@ static inline Pos report_pos() {
 
 static inline void echo(String inst) {
     Serial.println(inst);
+}
+
+void PID_program()
+{
+  int MAX_SPEED = 18;
+
+  read_sensor();
+  previousError = error; // save previous error for differential
+  error = avgSensor; // Count how much robot deviate from center
+  totalError += error;
+
+  power = (Kp * error) + (Kd * (error - previousError)); // pid hesaplamasi
+
+  if ( power > MAX_SPEED ) {
+    power = MAX_SPEED;
+  }
+  if ( power < -MAX_SPEED ) {
+    power = -MAX_SPEED;
+  }
+
+  if (power > 0) // Turn left
+  {
+    PWM_Right = MAX_SPEED + (5 * abs(int(power))) / 10;
+    PWM_Left = MAX_SPEED -  (6 * abs(int(power))) / 10;
+  }
+  else // Turn right
+  {
+    PWM_Right = MAX_SPEED - (6 * abs(int(power))) / 10;
+    PWM_Left = MAX_SPEED +  (5 * abs(int(power))) / 10;
+  }
+
 }
