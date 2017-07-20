@@ -9,7 +9,7 @@ const int ssr[SENSOR_NUMBER] = {4, 5, 6, 7, 8, 9};
 
 typedef enum AGV_opcode {
     MOV = 'W', RIGHT = 'A', LEFT = 'D', POS = 'P', BACK = 'S', SLOW = 'E', 
-    HALT = 'Q' 
+    HALT = 'Q', NORMAL = 'N'
 } AGV_opcode;
 
 struct Pos {
@@ -17,10 +17,12 @@ struct Pos {
     String rfid;
 };
 
-struct Station {
-    bool loading;
-    bool unloading;
-    bool turning;
+String lastrfid="";
+
+struct Status {
+    bool left;
+    bool right;
+    bool forward;
 }
 
 class Sensors {
@@ -102,7 +104,7 @@ void Sensors::setError() {
 #define SS_PIN 53 //10
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
-
+bool gir;
 void setup() {
     for (int i = 0; i < SENSOR_NUMBER; i++)  {
         pinMode(ssr[i], INPUT);
@@ -118,60 +120,50 @@ void read_sensor() {
 }
 
 void loop() {
+    char inst = N;
     if (Serial.available()) {
-        char inst = Serial.read();
+        inst = Serial.read();
         if (inst == POS)
+        {
             Serial.println(report_pos().rfid);
-        else
-            lineFollow(inst);
+        }
+        gir = true ;
+    }
+
+    if ( gir == true ) {
+        lineFollow(inst);
     }
 }
 
-void lineFollow(char inst)
-{
-    if (cur_pos.rfid == "NO NEW CARD PRESENT") {
-        cur_pos = report_pos();
-    }
-    while (1) {
-        Serial.println(cur_pos.rfid);
-        Pos new_pos = report_pos();
-        if (new_pos.success && new_pos.rfid != cur_pos.rfid ) {
-            Serial.println(new_pos.rfid);
-            return;
-        }
-        PID_and_go();
-    }
+void lineFollow(char inst) {
+        Status cur_status = de(inst);
+        PID(cur_status);
+        go();
 }
 
 void PID_and_go() {
     Serial.println("YOLDA");
 }
 
-void de(char inst) {
+Status de(char inst) {
     Pos cur_pos;
+    Status cur_status;
+    cur_status.forward = cur_status.right = cur_status.left = false
     switch (inst) {
-        case MOV:
-            lineFollow(cur_pos);
-            break;
         case RIGHT:
-            turn_right();
-            lineFollow(cur_pos);
-            break;
+            cur_status.right = true;
+            return cur_status
         case LEFT:
-            turn_left();
-            lineFollow(cur_pos);
-            break;
-        case BACK:
-            turn_back();
-            lineFollow(cur_pos);
-            break;
+            cur_status.left = true;
+            return cur_status
+        case FORWARD:
+            cur_status.forward = true;
+            return cur_status
         case POS:
             cur_pos = report_pos();
             Serial.println(cur_pos.rfid);
             break;
         case HALT:
-            Serial.println("G");
-            Serial.println("HALT");
         default:
             Serial.println("HALT");
             break;
@@ -207,13 +199,21 @@ static inline Pos report_pos() {
         return position;
     }
 
-    position.success = true;
+    
     for (byte i = 0; i < mfrc522.uid.size; i++) {
         position.rfid += mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ";
         position.rfid += String(mfrc522.uid.uidByte[i], HEX);
     }
     position.rfid.trim();
     position.rfid.toUpperCase();
+    if(position.rfid == lastrfid)
+    {
+        position.rfid = "SAME RFID CARD";
+        return position;
+    }
+    lastrfid = position.rfid;
+    position.success = true;
+    
     return position;
 }
 
